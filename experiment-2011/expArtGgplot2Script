@@ -1,0 +1,48 @@
+data <- read.table("artData2011.txt", header = T)
+attach(data)
+
+library(ggplot2)
+library(doBy)
+densTim5 <- (count0.5-count5WoT)/size
+
+# create summary funciton
+
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE, conf.interval=.95) {
+    require(doBy)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # Collapse the data
+    formula <- as.formula(paste(measurevar, paste(groupvars, collapse=" + "), sep=" ~ "))
+    datac <- summaryBy(formula, data=data, FUN=c(length2,mean,sd), na.rm=na.rm)
+
+    # Rename columns
+    names(datac)[ names(datac) == paste(measurevar, ".mean",    sep="") ] <- measurevar
+    names(datac)[ names(datac) == paste(measurevar, ".sd",      sep="") ] <- "sd"
+    names(datac)[ names(datac) == paste(measurevar, ".length2", sep="") ] <- "N"
+    
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+    
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+    
+    return(datac)
+}
+
+# plot
+
+gDat <- summarySE(data, measurevar="densTim5", groupvars="treatment")
+
+p <- ggplot(data=gDat, aes(x=treatment, y=densTim5)) + 
+	geom_bar() +
+	geom_errorbar(aes(ymin=densTim5-se, ymax=densTim5+se), width=.2,
+	position=position_dodge(.9)) + ylab("T. cristinae density")
+p
+

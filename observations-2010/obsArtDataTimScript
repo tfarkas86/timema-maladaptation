@@ -1,0 +1,35 @@
+# load and attach data
+
+data <- read.table("obsArtData.txt", header=T)
+attach(data)
+
+# define interactive predictors
+
+malHost <- malMd * hostNumAdZ
+malGeo <- malMd * geoCon
+hostGeo <- hostNumAdZ * geoCon
+malHostGeo <- malMd * geoCon * hostNumAdZ
+
+# get all possible models
+
+predictors <- data.frame(malMd, hostNumCeZ, geoCon, malHost, malGeo, 
+hostGeo, malHostGeo)
+predictors
+length(predictors)
+
+predNames <- c("mal", "host", "geo", "mal*host", "mal*geo", "host*geo", 
+"mal*host*geo")
+predNames
+
+leaps1 <- leaps(predictors, timMd, method="adjr2", names=predNames, nbest=100)
+leaps1
+
+bestMods <- order(leaps1$adjr2, decreasing = T, nbest = 100)
+
+showMods <- leaps1$which[bestMods,]
+
+# best model
+
+an1 <- lm(timMd ~ malMd + geoCon + malMd*geoCon)
+summary(an1)
+

@@ -1,0 +1,78 @@
+data <- read.table("obsArtData.txt", header=T)
+attach(data)
+
+an1 <- lm(art ~ hostNumCeZ + geoCon + timMd + malMd + hostNumCeZ*geoCon +
+hostNumCeZ*timMd + hostNumCeZ*malMd + timMd*malMd + hostNumCeZ*timMd*malMd)
+summary(an1)
+
+an1 <- lm(art ~ hostCon + geoCon + timMd + malMd + hostCon*geoCon +
+hostCon*timMd + hostCon*malMd + timMd*malMd + hostCon*timMd*malMd)
+summary(an1)
+
+an1 <- lm(art ~ hostNumCeZ + geoCon + timMSD + malMd + hostNumCeZ*geoCon +
+hostNumCeZ*timMSD + hostNumCeZ*malMd + timMSD*malMd + hostNumCeZ*timMSD*malMd)
+summary(an1)
+
+
+an1 <- lm(art ~ hostNumCeZ + geoCon + timPSD + malMd + hostNumCeZ*geoCon +
+hostNumCeZ*timPSD + hostNumCeZ*malMd + timPSD*malMd + hostNumCeZ*timPSD*malMd)
+summary(an1)
+
+## RICHNESS
+
+malHost <- malMd * hostNumAdZ
+malGeo <- malMd * geoCon
+malTim <- malMd * timMd
+hostGeo <- hostNumAdZ * geoCon
+hostTim <- hostNumAdZ * timMd
+geoTim <- geoCon * timMd
+malHostGeo <- malMd * geoCon * hostNumAdZ
+malHostTim <- malMd * hostNumAdZ * timMd
+hostTimGeo <- hostNumAdZ * timMd * geoCon
+malHostTimGeo <- malMd * hostNumAdZ * timMd * geoCon
+
+
+predictors <- data.frame(malMd, hostNumAdZ, geoCon, timMd, malHost, malGeo, malTim, hostGeo, hostTim, geoTim, malHostGeo, malHostTim, hostTimGeo, malHostTimGeo)
+predictors
+
+predNames <- c("mal", "host", "geo", "tim", "mal*host", "mal*geo", "mal*Tim", "host*geo", 
+"host*tim", "geo*tim", "mal*host*geo", "mal*host*tim", "host*tim*geo", "mal*host*tim*geo")
+predNames
+
+leaps1 <- leaps(predictors, rich, method="Cp", names=predNames)
+leaps1
+
+an1 <- lm(timMd ~ malMd + hostNumAdZ + geoCon + malMd*hostNumAdZ + malMd*geoCon +
+hostNumAdZ*geoCon)
+summary(an1)
+
+an1 <- lm(rich ~ hostNumCeZ + geoCon + timMd + malMd + hostNumCeZ*geoCon + hostNumCeZ*timMd +    
+hostNumCeZ*malMd + geoCon*timMd + timMd*malMd + hostNumCeZ*geoCon*timMd)
+summary(an1)
+
+an1 <- lm(rich ~ hostNumCeZ + geoCon + timMSD + malMd + hostNumCeZ*geoCon + hostNumCeZ*timMSD +  
+hostNumCeZ*malMd + geoCon*timMSD + timMSD*malMd + hostNumCeZ*geoCon*timMSD)
+summary(an1)
+
+an1 <- lm(rich ~ hostNumCeZ + geoCon + timPSD + malMd + hostNumCeZ*geoCon + hostNumCeZ*timPSD +  
+hostNumCeZ*malMd + geoCon*timPSD + timPSD*malMd + hostNumCeZ*geoCon*timPSD)
+summary(an1)
+
+## Timema Density
+
+malHost <- malMd * hostNumAdZ
+malGeo <- malMd * geoCon
+hostGeo <- hostNumAdZ * geoCon
+malHostGeo <- malMd * geoCon * hostNumAdZ
+
+predictors <- data.frame(malMd, hostNumAdZ, geoCon, malHost, malGeo, hostGeo, malHostGeo)
+predictors
+
+predNames <- c("mal", "host", "geo", "mal*host", "mal*geo", "host*geo", "mal*host*geo")
+predNames
+
+leaps1 <- leaps(predictors, timMd, method="adjr2", names=predNames)
+
+an1 <- lm(timMd ~ malMd + hostNumAdZ + geoCon + malMd*hostNumAdZ + malMd*geoCon +
+hostNumAdZ*geoCon)
+summary(an1)

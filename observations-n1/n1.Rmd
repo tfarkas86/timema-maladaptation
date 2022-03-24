@@ -1,0 +1,1619 @@
+---
+title: "Network 1 Timema Analysis"
+author: "Tim Farkas"
+date: "2/13/2018"
+output: html_document
+---
+
+## Data Input and Manipulation
+```{r Load & Subset Data}
+rm(list=ls())
+
+# all arthropod data 
+
+ad <- read.csv("/Users/tfarkas/Dropbox/Projects/CA Arthropods/N1/Data/csv_for_r/all_art_n1_data2013.csv", 
+               colClasses=c(plant_id = "factor"))
+ad <- droplevels(ad[ad$plant_id != "021", ])
+
+# plant-level data
+n1 <- read.csv("~/Dropbox/Projects/CA Arthropods/N1/Data/csv_for_r/n1_plant_data_16Sept14.csv", 
+               colClasses=c(plant_id="character"))
+n1$plant_id <- as.factor(ifelse(nchar(n1$plant_id) == 1, paste("00", n1$plant_id, sep = ""), 
+                      ifelse(nchar(n1$plant_id) == 2, paste("0", n1$plant_id, sep=""), 
+                             n1$plant_id)))
+
+# carbon-nitrogen data
+cnd.raw <- read.csv("~/Dropbox/Projects/CA Arthropods/N1/Data/cn_data.csv")
+
+cnd.raw$id <- as.factor(ifelse(nchar(cnd.raw$id) == 1, paste("00", cnd.raw$id, sep = ""), 
+                      ifelse(nchar(cnd.raw$id) == 2, paste("0", cnd.raw$id, sep=""), 
+                             cnd.raw$id)))
+```
+
+```{r NDFS function}
+nfmal <- function(mal=NULL, k=1) {
+  freq <- 1 - mal
+  # adapted moph
+  min.RSS <- function(data, par) {
+              with(data, sum(( (par[1] / (1 - ((par[2] - par[1])/par[2]) * exp((-1) * k * x))) - y)^2))
+  }
+
+  dat.ad <- data.frame(x = c(0.2, 0.8), y = c(1, .65))
+  pars.ad <- optim(par = c(0,1), min.RSS, data=dat.ad)$par
+  
+  freqs <- seq(0, 1, .01)
+  ws.ad <-  (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * freqs)))
+  
+  # plot(freqs, ws.ad)
+  
+  # maladapted morph
+  
+  ws.mal <- rev(ws.ad) - .35 
+  
+  raw <- (ws.ad * freqs) + (ws.mal * (1 - freqs))
+  
+  min.w <- min(raw)
+  max.w <- max(raw - min.w)
+  
+  scaled <- (raw - min.w)/max.w
+  cbind(freqs, scaled)
+  plot(rev(freqs), 1 - scaled)
+  #plot(freqs, ws.ad, ylim=c(-2, 2), type="l")
+  #plot(freqs, ws.ad, type="l")
+  #lines(freqs, ws.mal, lty=2)
+  
+  # for output
+   ws.ad2 <- (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * freq)))
+   ws.mal2 <- (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * (1-freq)))) - .35
+   raw2 <- (ws.ad2 * freq) + (ws.mal2 * (1 - freq))
+   sc2 <- (raw2-min.w) / max.w
+  
+  #plot(freqs, mal)
+  #pars.ad
+
+  1 - sc2
+
+}
+```
+
+```{r Add Variables to n1 data}
+## overwrite with new maladaptation measure
+
+# manipulate data and add variables 
+n1$cn2 <- cnd.raw$cn[match(n1$plant_id, cnd.raw$id)]
+n1$pC <- cnd.raw$wC[match(n1$plant_id, cnd.raw$id)]
+n1$pN <- cnd.raw$wN[match(n1$plant_id, cnd.raw$id)]
+
+n1$host <- factor(n1$host)
+n1$occupied <- ifelse(n1$no_tim == 0, 0, 1)
+n1$pcon_mal <- ifelse(n1$host=="A", n1$con_tim_C/n1$con_tim, n1$con_tim_A/n1$con_tim)
+n1$con_mal <- ifelse(n1$host=="A", n1$con_tim_C, n1$con_tim_A)
+n1$con_ad <- ifelse(n1$host=="C", n1$con_tim_C, n1$con_tim_A)
+n1$c.con_art5 <- n1$con_art5-mean(n1$con_art5)
+n1$c.con_art <- n1$con_art-mean(n1$con_art)
+n1$nf_mal_k0.01 <- nfmal(n1$mal, k=.01)
+n1$nf_mal_k0.6 <- nfmal(n1$mal, k=0.6)
+n1$nf_mal_k1.2 <- nfmal(n1$mal, k=1.2)
+n1$nf_mal_k2.0 <- nfmal(n1$mal, k=2)
+n1$nf_mal_k3.0 <- nfmal(n1$mal, k=3)
+n1$nf_mal_k4.0 <- nfmal(n1$mal, k=4)
+n1$c.mal <- n1$mal-mean(n1$mal, na.rm=TRUE)
+n1$c.nf_mal_k0.01 <- n1$nf_mal_k0.01 - mean(n1$nf_mal_k0.01, na.rm=TRUE)
+n1$c.nf_mal_k0.6 <- n1$nf_mal_k0.6 - mean(n1$nf_mal_k0.6, na.rm=TRUE)
+n1$c.nf_mal_k1.2 <- n1$nf_mal_k1.2 - mean(n1$nf_mal_k1.2, na.rm=TRUE)
+n1$c.nf_mal_k2.0 <- n1$nf_mal_k2.0 - mean(n1$nf_mal_k2.0, na.rm=TRUE)
+n1$c.nf_mal_k3.0 <- n1$nf_mal_k3.0 - mean(n1$nf_mal_k3.0, na.rm=TRUE)
+n1$c.nf_mal_k4.0 <- n1$nf_mal_k4.0 - mean(n1$nf_mal_k4.0, na.rm=TRUE)
+n1$no_mal <- ifelse(n1$host=="C", n1$no_str_tim, n1$no_grn_tim)
+n1$no_adp <- ifelse(n1$host=="A", n1$no_str_tim, n1$no_grn_tim)
+n1$con_grn <- n1$con_grn_A + n1$con_grn_C 
+n1$con_str <- n1$con_str_A + n1$con_str_C
+n1$rcon_grn <- n1$con_grn/n1$con_tim
+n1$rcon_grn_A <- n1$con_grn_A/n1$con_grn
+n1$rcon_grn_C <- n1$con_grn_C/n1$con_grn
+n1$con_q2N_A <- n1$q2N_A*n1$con_tim
+n1$con_q2N_C <- n1$q2N_C*n1$con_tim
+n1$rcon_q2N_C <- n1$q2N_C/(n1$q2N_A+n1$q2N_C)
+n1$rcon_vol_C <- n1$con_vol_C/n1$con_vol
+n1$rcon_tim_C <- n1$con_tim_C/n1$con_tim
+n1_occ <- n1[n1$no_tim_gs>0,]
+n1$dens_art_5 <- n1$no_art_5 / n1$ln.vol_cub
+n1$dens_tim_5 <- n1$no_tim_5 / n1$ln.vol_cub
+n1$cn_rat <- n1$cn_ratio
+n1$vol_cubm <- n1$vol_cub * 0.000016
+n1$any_dens <- n1$no_any/n1$vol_cubm
+n1$any_dens_4 <- n1$no_any_4/n1$vol_cubm
+n1$mal2 <- n1$mal^2
+n1$c.mal2 <- n1$c.mal^2
+n1$c.no_art_5 <- n1$no_art_5 - mean(n1$no_art_5)
+n1$c.no_tim <- n1$no_tim - mean(n1$no_tim)
+n1$c.host <- ifelse(n1$host == "A", -.5, .5)
+n1$con_q2N_mal <- ifelse(n1$host == "A", n1$con_q2N_C, n1$con_q2N_A)
+n1$con_q2N_ad <- ifelse(n1$host == "C", n1$con_q2N_C, n1$con_q2N_A)
+
+
+```
+
+```{r Calculate Mass-Abundance Relationships - Gabby's Way}
+
+# subset data -- using arthropods over 5mm in body length only
+dd_5 <- droplevels(subset(ad, !is.na(ad$weight) & ad$is_5 ))
+dd_5$plant_id <- as.factor(dd_5$plant_id)
+
+
+bins <- 20 # choose number of bins
+dd_5$mass.bin<-cut(log(dd_5$weight), bins) # cut into pieces
+ist
+work <- dd_5[, c("plant_id", "host", "weight", "mass.bin")] # extract columns
+
+
+pids <- levels(work$plant_id)
+ll <- length(pids)
+
+# initialize structures to collect coefficients
+slopes<-rep(NA, ll)
+int1 <- rep(NA, ll)
+int3 <- rep(NA, ll)
+int5 <- rep(NA, ll)
+int7 <- rep(NA, ll)
+int8 <- rep(NA, ll)
+int9 <- rep(NA, ll)
+int10 <- rep(NA, ll)
+int18 <- rep(NA, ll)
+int20 <- rep(NA, ll)
+pid <- levels(work$plant_id)
+sd <- data.frame(pid, int1, int3, int5, int7, int8, int9, int10, int18, int20, slopes)
+
+# loop over plants to create mass-abundance relationships
+for(i in 1:ll) {
+  
+  plant <- subset(work, plant_id==pids[i])
+
+  # get counts of artropods in each bin
+  mass.ab <- data.frame(with(plant, table(mass.bin)), cat=levels(plant$mass.bin))
+  
+  # create rank of log mass bins, and recenter data for intercept analysis
+  mass.ab$cat.code0 <- 1:bins
+  mass.ab$cat.code1 <- mass.ab$cat.code0 - 1 
+  mass.ab$cat.code3 <- mass.ab$cat.code0 - 3
+  mass.ab$cat.code5 <- mass.ab$cat.code0 - 5
+  mass.ab$cat.code7 <- mass.ab$cat.code0 - 7
+  mass.ab$cat.code8 <- mass.ab$cat.code0 - 8
+  mass.ab$cat.code9 <- mass.ab$cat.code0 - 9
+  mass.ab$cat.code10 <- mass.ab$cat.code0 - 10
+  mass.ab$cat.code18 <- mass.ab$cat.code0 - 18
+  mass.ab$cat.code20 <- mass.ab$cat.code0 - 20
+  
+  # replace 0 with NAs
+  mass.ab$Freq[mass.ab$Freq==0] <- NA
+  plot.these <- mass.ab
+  
+  # run simple regression models
+  mod0 <- lm(log(Freq) ~ cat.code0, data = plot.these)
+  mod1 <- lm(log(Freq) ~ cat.code1, data = plot.these)
+  mod3 <- lm(log(Freq) ~ cat.code3, data = plot.these)
+  mod5 <- lm(log(Freq) ~ cat.code5, data = plot.these)
+  mod7 <- lm(log(Freq) ~ cat.code7, data = plot.these)
+  mod8 <- lm(log(Freq) ~ cat.code8, data = plot.these)
+  mod9 <- lm(log(Freq) ~ cat.code9, data = plot.these)
+  mod10 <- lm(log(Freq) ~ cat.code10, data = plot.these)
+  mod18 <- lm(log(Freq) ~ cat.code18, data = plot.these)
+  mod20 <- lm(log(Freq) ~ cat.code20, data = plot.these)
+  
+  # collect the coefficients
+  sd$int1[i] <- coef(mod1)[1]
+  sd$int3[i] <- coef(mod3)[1]
+  sd$int5[i] <- coef(mod5)[1]
+  sd$int7[i] <- coef(mod7)[1]
+  sd$int8[i] <- coef(mod8)[1]
+  sd$int9[i] <- coef(mod9)[1]
+  sd$int10[i] <- coef(mod10)[1]
+  sd$int18[i] <- coef(mod18)[1]
+  sd$int20[i] <- coef(mod20)[1]
+  sd$slopes[i]<-coef(mod0)[2]
+  
+}
+
+# fix plant ID codes to be 3 character factor
+sd$pid <- as.character(sd$pid)
+sd$pid <- as.factor(ifelse(nchar(sd$pid) == 1, paste("00", sd$pid, sep = ""), 
+                                ifelse(nchar(sd$pid) == 2, paste("0", sd$pid, sep=""), 
+                                       sd$pid)))
+
+# NA all intercepts for which no slope could be calculated (n = 1 or 2)
+sd[is.na(sd$slopes), 2:11] <- NA
+
+# add data to n1
+
+## add intercepts to n1
+
+n1$mas <- NA
+n1$mai1 <- NA
+n1$mai3 <- NA
+n1$mai5 <- NA
+n1$mai7 <- NA
+n1$mai8 <- NA
+n1$mai9 <- NA
+n1$mai10 <- NA
+n1$mai18 <- NA
+n1$mai20 <- NA
+
+# add data, excluding plant 021
+n1[match(sd$pid[sd$pid != "021"], n1$plant_id), 
+   c("mai1", "mai3", "mai5", "mai7", "mai8", "mai9", "mai10", "mai18", "mai20", "mas")] <- sd[sd$pid != "021", 2:11]
+```
+
+```{r MAS for all communities combined}
+bins <- 20 # choose number of bins
+dd_5$mass.bin<-cut(log(dd_5$weight), bins) # cut into pieces
+
+work2 <- dd_5[, c("plant_id", "host", "weight", "mass.bin")]
+
+mass.ab <- data.frame(table(dd_5$mass.bin))
+
+# check it
+sum(mass.ab$Freq)
+
+plot(x=1:20, y=mass.ab$Freq)
+```
+
+
+```{r Calculate Mass-Abundance Relationships - Tim's Way}
+mad <- droplevels(ad[!is.na(ad$weight) & ad$is_4, ])
+
+mas <- aggregate(mad$weight, by=list(plant_id = mad$plant_id), FUN=function(x) {
+  
+  if(length(x) < 3) return(NA)
+  
+  lw <- log(x)
+  h1 <- hist(x)
+  cnt <- h1$counts
+  cnt[cnt==0] <- NA
+  mids <- h1$mids
+  an1 <- lm(log(cnt) ~ log(mids))
+ 
+  return(c(mas=an1$coefficients[2]))
+  
+})
+
+# add to N1 data
+n1$mas <- mas[match(n1$plant_id, mas$plant_id), "x"]
+
+```
+
+## Regression Analyses
+
+#### Drivers of Maladaptation
+
+```{r Maladaptation}
+an1 <- lm(mal ~ host, data=n1)
+summary(an1)
+```
+
+#### Effects of Maladaptation
+
+```{r Timema Abundance}
+contrasts(n1$host) <- c(-0.5, 0.5)
+contrasts(n1$host) <- c(0, 1)
+contrasts(n1$host) <- c(1, 0)
+
+# main effect models
+an1.1 <- glm(no_tim ~ c.mal + host + ln.vol_cub + con_tim + cn2,
+             family=quasipoisson, 
+           data=n1, subset=no_tim > 4)
+summary(an1.1)
+
+an1.2 <- glm(no_tim ~ c.mal + host + ln.vol_cub + con_tim,
+             family=quasipoisson, 
+           data=n1, subset=no_tim > 4)
+summary(an1.2)
+
+an1.3 <- glm(no_tim ~ host + ln.vol_cub + con_tim,
+             family=quasipoisson, 
+           data=n1, subset=no_tim > 4)
+summary(an1.3)
+
+# final model
+an1.f <- glm(no_tim ~ ln.vol_cub + con_tim,
+             family=quasipoisson, 
+           data=n1, subset=no_tim > 4)
+summary(an1.f)
+ 
+##### With Neg-Freq Dep Mal Calc -- no difference
+
+an1.1 <- glm(no_tim ~  con_tim + ln.vol_cub,
+             family=quasipoisson, 
+           data=n1, subset=no_tim > 4)
+summary(an1.1)
+
+```
+
+```{r Arthropod Abundance}
+
+contrasts(n1$host) <- c(-0.5, 0.5)
+contrasts(n1$host) <- c(0, 1)
+contrasts(n1$host) <- c(1, 0)
+
+#### for new maladaptation model -- from p = 0.03 to 0.056
+an2.1 <- glm(no_art_5 ~ c.nf_mal_k0.5 + ln.vol_cub + c.con_art5*host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+summary(an2.1)
+####
+
+
+an2.1 <- glm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5*host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+summary(an2.1)
+
+an2.2 <- glm(no_art_5 ~ c.mal + ln.vol_cub + host * c.con_art5, 
+             family=quasipoisson, data=n1, subset=no_tim>1)
+summary(an2.2)
+
+an2.3 <- glm(no_art_5 ~ mal + host + ln.vol_cub + host*c.con_art5 + cn_rat, 
+             family=quasipoisson, data=n1)
+summary(an2.3)
+
+an2.4 <- glm(no_art_5 ~ mal * host + ln.vol_cub, family=quasipoisson, data=n1)
+summary(an2.4)
+
+# main effect models
+an2.1 <- glm(no_art_5 ~ c.mal + ln.vol_cub + cn2 + c.con_art5*host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+summary(an2.1)
+
+an2.f <- glm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5*host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+summary(an2.f)
+
+# partial r-sq
+an2.1 <- glm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5,
+           family=quasipoisson, data=n1, subset = host=="C")
+summary(an2.1) # 37.6% R-sq
+
+n1.p <- n1[complete.cases(n1$no_art_5, n1$c.mal, n1$ln.vol_cub, n1$c.con_art5), ]
+n1.p$no_art_5 <- sqrt(n1.p$no_art_5)
+
+an.full <- lm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5,
+           data=n1.p, subset = host=="C")
+
+an.art_mal <- lm(no_art_5 ~ ln.vol_cub + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.art_vol <- lm(no_art_5 ~ c.mal + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.art_con <- lm(no_art_5 ~ c.mal + ln.vol_cub, 
+           data=n1.p, subset=host=="C")
+an.mal <- lm(c.mal ~ ln.vol_cub + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.vol <- lm(ln.vol_cub ~ c.mal + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.con <- lm(c.con_art5 ~ c.mal + ln.vol_cub, 
+           data=n1.p, subset=host=="C")
+
+r.art_mal <- resid(an.art_mal)
+r.art_vol <- resid(an.art_vol)
+r.art_con <- resid(an.art_con)
+r.mal <- resid(an.mal)
+r.vol <- resid(an.vol)
+r.con <- resid(an.con)
+
+an.p_mal <- lm(r.art_mal ~ r.mal)
+summary(an.p_mal) # r-sq = 5.91 %
+an.p_vol <- lm(r.art_vol ~ r.vol)
+summary(an.p_vol) # r-sq = 33.7 %
+an.p_con <- lm(r.art_con ~ r.con)
+summary(an.p_con) # r-sq = 7.11 %
+
+# herbivore abundance
+anh <- glm(no_herb_5 ~ host*c.con_art5 + cn2 + ln.vol_cub, 
+           family=quasipoisson, data=n1)
+summary(anh)
+```
+
+```{r Arthropod Richness}
+# on arthropod diversity (5 mm)
+
+contrasts(n1$host) <- c(-0.5, 0.5)
+contrasts(n1$host) <- c(0, 1)
+contrasts(n1$host) <- c(1, 0)
+
+## for neg freq dep mal
+an3 <- glm(rich_art_5 ~ c.nf_mal_k2.0 * host + ln.vol_cub, 
+           family=quasipoisson, data=n1, subset=no_tim > 0)
+summary(an3)
+##
+
+
+an3 <- glm(rich_art_5 ~ c.mal*host + ln.vol_cub + host * c.con_art5, 
+           family=quasipoisson, data=n1, subset=no_tim > 0)
+summary(an3)
+
+an3 <- glm(rich_art_5 ~ host*c.mal + host+ ln.vol_cub + host*c.con_art5, 
+           family=quasipoisson, data=n1, subset=no_tim_gs > 0)
+summary(an3)
+
+contrasts(n1$host) <- c(0,1)
+an3.1 <- glm(rich_art_5 ~ host*c.mal + host+ ln.vol_cub + c.con_art5, 
+             family=quasipoisson, data=n1, subset=no_tim>1)
+summary(an3.1)
+
+an3.2 <- glm(rich_art_5 ~ host*c.mal + host+ ln.vol_cub + host*c.con_art5 +
+               cn_rat, 
+           family=quasipoisson, data=n1, subset=no_tim_gs > 3)
+summary(an3.2)
+
+# final model
+
+an3.1 <- glm(rich_art_5 ~ host*c.mal + ln.vol_cub + cn2 + host*c.con_art5, 
+           family=quasipoisson, data=n1)
+summary(an3.1)
+
+an3.f <- glm(rich_art_5 ~ host*c.mal + ln.vol_cub + host*c.con_art5, 
+           family=quasipoisson, data=n1)
+summary(an3.f)
+
+# partial r-sq
+
+an3 <- glm(rich_art_5 ~ c.mal + ln.vol_cub + c.con_art5, 
+           family=quasipoisson, data=n1, subset=host=="C")
+summary(an3) # R-sq = 53% total
+
+n1.p <- n1[complete.cases(n1$rich_art_5, n1$c.mal, n1$ln.vol_cub, n1$c.con_art5), ]
+n1.p$rich_art_5 <- sqrt(n1.p$rich_art_5)
+
+an.rich_mal <- lm(rich_art_5 ~ ln.vol_cub + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.rich_vol <- lm(rich_art_5 ~ c.mal + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.rich_con <- lm(rich_art_5 ~ c.mal + ln.vol_cub, 
+           data=n1.p, subset=host=="C")
+an.mal <- lm(c.mal ~ ln.vol_cub + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.vol <- lm(ln.vol_cub ~ c.mal + c.con_art5, 
+           data=n1.p, subset=host=="C")
+an.con <- lm(c.con_art5 ~ c.mal + ln.vol_cub, 
+           data=n1.p, subset=host=="C")
+
+r.rich_mal <- resid(an.rich_mal)
+r.rich_vol <- resid(an.rich_vol)
+r.rich_con <- resid(an.rich_con)
+r.mal <- resid(an.mal)
+r.vol <- resid(an.vol)
+r.con <- resid(an.con)
+
+an.p_mal <- lm(r.rich_mal ~ r.mal)
+summary(an.p_mal) # r-sq = 9.92 %
+an.p_vol <- lm(r.rich_vol ~ r.vol)
+summary(an.p_vol) # r-sq = 42.3 %
+an.p_con <- lm(r.rich_con ~ r.con)
+summary(an.p_con) # r-sq = 5.84 %
+```
+
+```{r Carbon:Nitrogen}
+
+contrasts(n1$host) <- c(-0.5, 0.5)
+contrasts(n1$host) <- c(0, 1)
+contrasts(n1$host) <- c(1, 0)
+
+an5 <- lm(cn2 ~ c.mal + host + ln.vol_cub , data=n1, subset=no_tim > 0)
+summary(an5)
+
+an6 <- lm(cn2 ~ pC, data=n1)
+an7 <- lm(cn2 ~ pN, data=n1)
+summary(an6)
+summary(an7)
+
+contrasts(n1$host) <- c(0, 1)
+an5 <- lm(pC ~ c.mal + host, data=n1, subset=no_tim>0)
+summary(an5)
+
+contrasts(n1$host) <- c(0, 1)
+an5 <- lm(pN ~ c.mal + host + no_herb , data=n1, subset=no_tim>0)
+summary(an5)
+
+# final model
+an5.1 <- lm(cn2 ~ c.mal + host + ln.vol_cub + no_art_5, data=n1, subset=no_tim > 0)
+summary(an5.1)
+
+an5.2 <- lm(cn2 ~ c.mal + host + no_art_5, data=n1, subset=no_tim > 0)
+summary(an5.2)# R-sq = 80.2 %
+
+an5.f <- lm(cn2 ~ c.mal + host, data=n1, subset=no_tim > 0)
+summary(an5.f) 
+
+## neg freq dep mal
+an5.f <- lm(cn2 ~ c.nf_mal_k0.5 + host, data=n1, subset=no_tim > 0)
+summary(an5.f)
+##
+
+# partial r-sq
+p.n1 <- n1[complete.cases(n1$host, n1$c.mal, n1$cn2), ]
+p.n1$c.host <- ifelse(p.n1$host == "A", -.5, .5)
+
+an.mal <- lm(c.mal ~ c.host, data=p.n1)
+an.host <- lm(c.host ~ c.mal, data=p.n1)
+an.cn_h <- lm(cn2 ~ c.host, data=p.n1)
+an.cn_m <- lm(cn2 ~ c.mal, data=p.n1)
+
+r.mal <- resid(an.mal)
+r.host <- resid(an.host)
+r.cn_h <- resid(an.cn_h)
+r.cn_m <- resid(an.cn_m)
+
+an.p_mal <- lm(r.cn_h ~ r.mal) 
+summary(an.p_mal) # r-sq = 5.41%
+
+an.p_host <- lm(r.cn_m ~ r.host)
+summary(an.p_host) # r-sq = 77.7%
+```
+
+```{r Biomass}
+
+# on biomass
+
+an2 <- glm(biomass ~ mal, family=Gamma, start=rep(0, 2),
+           data=n1[n1$biomass > 0,])
+summary(an2)
+
+```
+
+```{r Connectivity}
+
+## connectivity on maladaptation?
+
+mal_nomal <- cbind(n1_occ$no_mal, n1_occ$no_adp)
+grn_str <- cbind(n1_occ$no_grn_tim, n1_occ$no_str_tim)
+
+an1 <- glm(tims ~ n1_occ$con_tim, family=binomial) # no effect of connectivity
+an2 <- glm(mal ~ con_tim, data=n1_occ)
+
+an3 <- glm(mal_nomal ~ no_art_5, family=binomial, data=n1_occ, subset=no_tim>0)
+summary(an3)
+
+an4 <- lm(mal ~ no_art_5 + ln.vol_cub + host + c.con_art5, data=n1)
+summary(an4)
+
+```
+
+```{r Plant Growth & Flowering}
+# plant growth
+
+hist(n1$avg_growth)
+
+an1 <- lm(avg_growth ~  con_art5 + host + no_art_5, data=n1)
+summary(an1)
+
+hist(n1$avg_no_flwrs)
+
+n1$no_not_herb_5 <- n1$no_art_5 - n1$no_herb_5
+an2 <- glm(avg_no_flwrs ~ no_herb_5 + ln.vol_cub, data=n1, family=quasipoisson)
+summary(an2)
+```
+
+```{r Mass-Abundance}
+contrasts(n1$host) <- c(-0.5, 0.5)
+contrasts(n1$host) <- c(0, 1)
+contrasts(n1$host) <- c(1, 0)
+
+an.s1 <- lm(mas ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim + c.con_art5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$c.mal < 0.6, ])
+summary(an.s1)
+
+an.sf <- lm(mas ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim + c.con_art5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an.sf)
+
+## neg freq dep mal
+an.sf <- lm(mas ~ host*c.nf_mal_k2.0 + host*c.no_art_5 + c.nf_mal_k2.0*c.no_tim + c.con_art5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an.sf)
+###
+
+an1 <- lm(mai1 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an1)
+an20 <- lm(mai20 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an20)
+
+an3 <- lm(mai3 ~ host*c.mal+ host*c.no_art_5 + c.mal*c.no_tim, 
+          data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an3)
+an5 <- lm(mai5 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+          data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an5)
+an7 <- lm(mai7 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+          data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an7)
+an8 <- lm(mai8 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+          data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an8)
+an9 <- lm(mai9 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+          data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an9)
+an10 <- lm(mai10 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+           data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an10)
+an18 <- lm(mai18 ~ host*c.mal + host*c.no_art_5 + c.mal*c.no_tim,
+           data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+summary(an18)
+
+# predictions on Adenostoma
+pred.slope <- predict(an.s, newdata=data.frame(host="A", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0, c.con_art5=0), se.fit=TRUE)
+pred.int <- predict(an1, newdata=data.frame(host="A", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0, c.con_art5=0), se.fit=TRUE)
+pred.int20 <- predict(an20, newdata=data.frame(host="A", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0, c.con_art5=0), se.fit=TRUE)
+
+# predictions on Ceanothus
+pred.slope <- predict(an.s, newdata=data.frame(host="C", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0, c.con_art5=0), se.fit=TRUE)
+pred.int <- predict(an1, newdata=data.frame(host="C", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0, c.con_art5=0), se.fit=TRUE)
+pred.int20 <- predict(an20, newdata=data.frame(host="C", c.mal=c(-.5, .5), c.no_art_5=0, c.no_tim=0), c.con_art5=0, se.fit=TRUE)
+
+# partial r-sq
+
+an.s2 <- lm(mas ~ c.mal + c.no_art_5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$host == "A", ])
+summary(an.s2) # R-sq = 18.4 %
+
+an.mas.art <- lm(mas ~ c.no_art_5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$host == "A", ])
+an.mas.mal <- lm(mas ~ c.mal, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$host == "A", ])
+an.mal.art <- lm(c.mal ~ c.no_art_5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$host == "A", ])
+an.art.mal <- lm(c.no_art_5 ~ c.mal, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0 & n1$host == "A", ])
+
+r.mas <- resid(an.mas.art)
+r.mal <- resid(an.mal.art)
+r.art <- resid(an.art.mal)
+
+an.p_mal <- lm(r.mas ~ r.mal)
+summary(an.p_mal) # r-sq = 5% on Adenostoma
+
+an.p_art <- lm(r.mal~ r.art)
+summary(an.p_art) # r-sq = 7% on Adenostoma
+```
+
+```{r Plot MAS vs. maladaptation}
+
+pdf(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/mas_curves_by_mal4A.pdf")
+
+plot(x=c(0, 19), y=c(-1, 3), type="n", las=1,
+     xlab="rank log biomass", ylab="log abundance", axes=FALSE)
+axis(1, at=c(0, 4, 9, 14, 19), labels=c(1, 5, 10, 15, 20))
+axis(2, at=seq(-1, 3, by=.5), 
+     labels=c("-1", "", "0", "", "1", "", "2", "", "3"), las=1)
+
+# lines(x=c(0, 19), y=c(pred.int$fit[1]-pred.int$se.fit[1], 
+#                       pred.int20$fit[1]+pred.int$se.fit[1]),
+#       col="blue", lty=2)
+# lines(x=c(0, 19), y=c(pred.int$fit[1]+pred.int$se.fit[1], 
+#                       pred.int20$fit[1]-pred.int$se.fit[1]),
+#       col="blue", lty=2)
+
+polygon(x=c(0, 0, 19, 19), y=c(pred.int$fit[1] - pred.int$se.fit[1], 
+                               pred.int$fit[1] + pred.int$se.fit[1], 
+                               pred.int20$fit[1] - pred.int20$se.fit[1], 
+                               pred.int20$fit[1] + pred.int20$se.fit[1]), 
+        lwd=.5, col="blue", density=150)
+
+lines(x=c(0, 19), y=c(pred.int$fit[1], pred.int20$fit[1]),
+      col="blue", lwd=2)
+
+# lines(x=c(0, 19), y=c(pred.int$fit[2]-pred.int$se.fit[2], 
+#                       pred.int20$fit[2]+pred.int$se.fit[2]),
+#       col="red", lty=2)
+# lines(x=c(0, 19), y=c(pred.int$fit[2]+pred.int$se.fit[2], 
+#                       pred.int20$fit[2]-pred.int$se.fit[2]),
+#       col="red", lty=2)
+
+polygon(x=c(0, 0, 19, 19), y=c(pred.int$fit[2] - pred.int$se.fit[2], 
+                               pred.int$fit[2] + pred.int$se.fit[2], 
+                               pred.int20$fit[2] - pred.int20$se.fit[2], 
+                               pred.int20$fit[2] + pred.int20$se.fit[2]), 
+        lwd=.5, col="red", density=150)
+
+lines(x=c(0, 19), y=c(pred.int$fit[2], pred.int20$fit[2]),
+      col="red", lwd=2)
+
+abline(v=c(2, 8), lty=2, lwd=1, col="darkgreen")
+
+legend(3, 2.5, legend=c("maladapted", "well adapted"), fill=c("red", "blue"), 
+       bty="n", cex=.9)
+
+arrows(x0=c(2, 8), x1=c(0, 11), y0=c(0.075, 0.5), y1=c(0.075, 0.5), length=.1)
+text(x=c(1, 9.25), y=c(0.2, .6), labels=c("p < 0.05", "p < 0.05"), cex=0.85)
+
+dev.off()
+```
+
+```{r Drivers of MAS}
+contrasts(n1$host) <- c(0, 1)
+
+an1 <- lm(mas ~ no_art_5 + c.mal*host, data=n1[n1$mas<0.6 & n1$no_art_5 > 5, ])
+summary(an1)
+
+an1 <- lm(mas ~ no_art_5, data=n1)
+summary(an1)
+
+plot(n1$mas[n1$no_art_5 > 5] ~ n1$no_art_5[n1$no_art_5 > 5])
+```
+
+```{r NFDS Analyses}
+
+nfds.stats <- as.data.frame(matrix(nrow = 7, ncol=12))
+
+# Timema abundance
+for(i in 1:6) {
+  
+an.tim <- glm(n1$no_tim ~ n1[[189 + i]] + n1$ln.vol_cub + n1$con_tim,
+             family=quasipoisson, data=n1,
+             subset=no_tim > 4)
+nfds.stats[1, c(2 * i - 1, 2 * i)] <- summary(an.tim)$coefficients[2, c(1, 4)]
+
+}
+
+# arthropod abundance
+
+for(i in 1:6) {
+  
+an.art <- glm(no_art_5 ~ n1[[189+i]] + n1$ln.vol_cub + n1$c.con_art5*n1$host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+nfds.stats[2, c(2 * i - 1, 2 * i)] <- summary(an.art)$coefficients[2, c(1, 4)]
+
+}
+
+# arthropod richness
+contrasts(n1$host) <- c(1, 0)
+
+for(i in 1:6) {
+
+an.rich <- glm(n1$rich_art_5 ~ n1$host * n1[[189+i]] + n1$ln.vol_cub + n1$cn2 + n1$host * n1$c.con_art5, 
+           family=quasipoisson, data=n1)
+nfds.stats[3:4, c(2 * i - 1, 2 * i)] <- summary(an.rich)$coefficients[c(3, 7), c(1, 4)]
+
+}
+
+# Mass-abundance
+
+contrasts(n1$host) <- c(0, 1)
+
+for(i in 1:6) {
+  
+an.mas <- lm(n1$mas ~ n1$host * n1[[189 + i]] + n1$host * n1$c.no_art_5 + n1[[189 + i]] * n1$c.no_tim + n1$c.con_art5, data=n1[n1$no_art_5 > 2 & n1$no_tim > 0, ])
+nfds.stats[5:6, c(2 * i - 1, 2 * i)] <- summary(an.mas)$coefficients[c(3, 7), c(1, 4)]
+
+}
+
+# carbon - nitrogen
+
+for(i in 1:6) {
+  
+an.cn <- lm(n1$cn2 ~ n1[[189 + i]] + n1$host + n1$ln.vol_cub + n1$no_art_5, data=n1, subset=no_tim > 0)
+nfds.stats[7, c(2 * i - 1, 2 * i)] <- summary(an.cn)$coefficients[2, c(1, 4)]
+  
+}
+
+nfds.stats$term <- c("mal", "mal", "mal", "mal * host", "mal", "mal * host", "mal")
+colnames(nfds.stats) <- rep(c("b", "p"), 6)
+write_csv(nfds.stats, path = "~/Dropbox/Projects/CA Arthropods/N1/Data/nfds_stats.csv")
+```
+
+
+## Path Analysis
+```{r Feedback Model}
+
+feed_model0 <- list(
+  
+  glm(no_art_5 ~ cn2 + host + ln.vol_cub, family=quasipoisson, data=n1), 
+  lm(cn2 ~ c.mal + host + ln.vol_cub, data=n1), 
+  lm(mas ~ cn2 + host + ln.vol_cub + no_art_5, data=n1),
+  lm(c.mal ~ ln.vol_cub + host, data=n1)
+  
+)
+
+sem.fit(feed_model0, n1)
+coefs_f0 <- sem.coefs(feed_model0, n1)
+coefs_f0
+
+feed_model1 <- list(
+  
+  glm(no_art_5 ~ cn2 + host + ln.vol_cub, family=quasipoisson, data=n1), 
+  lm(cn2 ~ host + ln.vol_cub, data=n1), 
+  lm(mas ~ cn2 + host + ln.vol_cub + no_art_5, data=n1),
+  lm(c.mal ~ cn2 + ln.vol_cub + host, data=n1)
+  
+)
+
+sem.fit(feed_model1, n1)
+coefs_f1 <- sem.coefs(feed_model1, n1)
+coefs_f1
+```
+
+```{r Density-Dependent Model}
+
+ddep_model0 <- list(
+  
+  glm(no_art_5 ~ ln.vol_cub + host, family=quasipoisson, data=n1), 
+  lm(mas ~ host + no_art_5 + ln.vol_cub, data=n1),
+  lm(c.mal ~ no_art_5 + host, data=n1)
+  
+)
+
+sem.fit(ddep_model0, n1)
+coefs_d0 <- sem.coefs(ddep_model0, n1)
+coefs_d0
+
+ddep_model1 <- list(
+  
+  glm(no_art_5 ~ ln.vol_cub + host + cn2, family=quasipoisson, data=n1), 
+  lm(cn2 ~ host + ln.vol_cub, data=n1), 
+  lm(mas ~ host + no_art_5 + ln.vol_cub, data=n1),
+  lm(c.mal ~ no_art_5 + host, data=n1)
+  
+)
+
+sem.fit(ddep_model1, n1)
+coefs_d1 <- sem.coefs(ddep_model1, n1)
+coefs_d1
+```
+
+```{r Simultaneous Effects Model}
+
+seff_model0 <- list(
+  
+  glm(no_art_5 ~ ln.vol_cub, family=quasipoisson, data=n1), 
+  lm(mas ~ host + no_art_5 + ln.vol_cub, data=n1),
+  lm(c.mal ~ host, data=n1)
+  
+)
+
+sem.fit(ddep_model0, n1)
+coefs_d0 <- sem.coefs(ddep_model0, n1)
+coefs_d0
+
+ddep_model1 <- list(
+  
+  glm(no_art_5 ~ ln.vol_cub + host + cn2, family=quasipoisson, data=n1), 
+  lm(cn2 ~ host + ln.vol_cub, data=n1), 
+  lm(mas ~ host + no_art_5 + ln.vol_cub, data=n1),
+  lm(c.mal ~ no_art_5 + host, data=n1)
+  
+)
+
+sem.fit(ddep_model1, n1)
+coefs_d1 <- sem.coefs(ddep_model1, n1)
+coefs_d1
+```
+## Figures
+
+```{r Timema abundance vs. maladaptation}
+
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_tim_mal.jpg", 
+     width=750, height=750)
+
+par(mar=c(5, 6, 1, 1))
+
+plot(y=jitter(n1$no_tim[n1$no_tim > 4], 2), 
+     x=jitter(n1$mal[n1$no_tim > 4], 10), 
+     xlab="maladaptation", ylab="", 
+     ylim=c(3, 17),
+     las=1, pch=16, 
+     cex=1.5, cex.lab=1.5, cex.axis=1.5)
+
+title(ylab=expression(paste(italic("T. cristinae"), " abundance")), cex.lab=1.5, line=3.5)
+
+axis.break(axis=2, breakpos=3.5)
+
+dev.off()
+
+```
+
+```{r Arthropod Abundance}
+
+
+an2.f <- glm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5*host,
+           family=quasipoisson, data=n1, subset = no_tim > 0)
+summary(an2.f)
+
+an2.f1 <- glm(no_art_5 ~ c.mal + ln.vol_cub + c.con_art5,
+           family=quasipoisson, data=n1, subset = no_tim > 0 & host== "C")
+summary(an2.f1)
+
+n1.2 <- n1[complete.cases(n1$no_art_5, n1$host, n1$c.mal, n1$ln.vol_cub, n1$c.con_art5, n1$no_tim), ]
+res.art <- resid(glm(no_art_5 ~ ln.vol_cub + c.con_art5*host,
+           family=quasipoisson, data=n1.2, subset = no_tim > 0 ), 'deviance')
+res.mal <- resid(lm(c.mal ~ ln.vol_cub + c.con_art5*host,
+           data=n1.2, subset = no_tim > 0), "pearson")
+
+an.res <- lm(res.art ~ res.mal); summary(an.res)
+nd=data.frame(res.mal=seq(min(res.mal), max(res.mal), len=50))
+preds <- predict(an.res, newdata=nd, type = "response", se.fit=TRUE)
+nd$fit <- preds$fit
+nd$lower <- preds$fit - preds$se.fit
+nd$upper <- preds$fit + preds$se.fit
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_art_mal.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 6, 1, 1))
+
+plot(y=res.art, x=res.mal, 
+     xlab="", ylab="", 
+     las=1, pch=16, 
+     cex=2, cex.lab=2, cex.axis=2)
+
+title(ylab="arthropod abundance (residuals)", cex.lab=3, line=3.5)
+title(xlab="maladaptation (residuals)", cex.lab=3, line=4.5)
+#axis.break(axis=2, breakpos=3.5)
+
+polygon(x = c(nd$res.mal, rev(nd$res.mal)), 
+        y = c(nd$upper, rev(nd$lower)), 
+        col="grey", density=100, lwd=.5)
+
+lines(nd$res.mal, nd$fit, lwd=2)
+
+dev.off()
+
+
+#lines(nd$res.mal, nd$upper, lty=2)
+#lines(nd$res.mal, nd$lower, lty=2)
+
+
+
+```
+
+```{r Arthropod Species Richness}
+
+an3.f <- glm(rich_art_5 ~ host*c.mal + ln.vol_cub + host*c.con_art5, 
+           family=quasipoisson, data=n1)
+summary(an3.f)
+n1.2 <- n1[complete.cases(n1$rich_art_5, n1$c.mal, n1$ln.vol_cub, n1$c.con_art5), ]
+
+# Adenostoma
+an3.fA <- glm(rich_art_5 ~ c.mal + ln.vol_cub + c.con_art5, 
+           family=quasipoisson, data=n1, subset=host=="A")
+summary(an3.fA)
+
+res.artA <- resid(glm(rich_art_5 ~ ln.vol_cub + c.con_art5,
+           family=quasipoisson, data=n1.2, subset = no_tim > 0 & host=="A" ), 'deviance')
+res.malA <- resid(lm(c.mal ~ ln.vol_cub + c.con_art5,
+           data=n1.2, subset = no_tim > 0 & host=="A"), "working")
+
+an.resA <- lm(res.artA ~ res.malA); summary(an.resA)
+ndA=data.frame(res.malA=seq(min(res.malA), max(res.malA), len=50))
+predsA <- predict(an.resA, newdata=ndA, type = "response", se.fit=TRUE)
+ndA$fit <- predsA$fit
+ndA$lower <- predsA$fit - predsA$se.fit
+ndA$upper <- predsA$fit + predsA$se.fit
+
+# Ceanothus
+an3.fC <- glm(rich_art_5 ~ c.mal + ln.vol_cub + c.con_art5, 
+           family=quasipoisson, data=n1, subset=host=="C")
+summary(an3.fC)
+
+res.artC <- resid(glm(rich_art_5 ~ ln.vol_cub + c.con_art5,
+           family=quasipoisson, data=n1.2, subset = no_tim > 0 & host=="C" ), 'deviance')
+res.malC <- resid(lm(c.mal ~ ln.vol_cub + c.con_art5,
+           data=n1.2, subset = no_tim > 0 & host=="C"), "working")
+
+an.resC <- lm(res.artC ~ res.malC); summary(an.resC)
+ndC=data.frame(res.malC=seq(min(res.malC), max(res.malC), len=50))
+predsC <- predict(an.resC, newdata=ndC, type = "response", se.fit=TRUE)
+ndC$fit <- predsC$fit
+ndC$lower <- predsC$fit - predsC$se.fit
+ndC$upper <- predsC$fit + predsC$se.fit
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_rich_mal.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 6, 1, 1))
+
+plot(y=c(res.artA, res.artC), x=c(res.malA, res.malC), 
+     xlab="", ylab="", 
+     ylim=c(min(c(res.artA, res.artC)), 3),
+     las=1, type="n", 
+     cex=2, cex.lab=2, cex.axis=2)
+
+title(ylab="arthropod richness (residuals)", cex.lab=3, line=3.5)
+title(xlab="maladaptation (residuals)", cex.lab=3, line=4)
+#axis.break(axis=2, breakpos=3.5)
+
+points(y=res.artA, x=res.malA, 
+       pch=16, col="blue", cex=2)
+points(y=res.artC, x=res.malC, 
+       pch=16, col="orange", cex=2)
+
+polygon(x = c(ndC$res.malC, rev(ndC$res.malC)), 
+        y = c(ndC$upper, rev(ndC$lower)), 
+        col="orange", density=100, lwd=.5)
+
+lines(ndC$res.malC, ndC$fit, lwd=2, col="orange")
+
+legend(x=-.5, y=3, 
+       legend=c(expression(italic("C. spinosus"), italic( "A. fasciculatum"))), 
+       pch=c(16, 16), col=c("orange", "blue"), 
+       bg=NULL, bty="n", cex=c(2, 2), y.intersp = 1)
+
+dev.off()
+
+```
+
+```{r Mass-Abundance Slope}
+n1.3 <- n1[complete.cases(n1$mas, n1$c.no_art_5, n1$c.mal), ]
+
+# Adenostoma
+an.s2A <- lm(mas ~ c.mal + c.no_art_5, data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "A", ])
+summary(an.s2A) # R-sq = 18.4 %
+
+an.mas.artA <- lm(mas ~ c.no_art_5, data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "A", ])
+an.mal.artA <- lm(c.mal ~ c.no_art_5, data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "A", ])
+
+res.masA <- resid(an.mas.artA)
+res.malA <- resid(an.mal.artA)
+
+an.p_malA <- lm(res.masA ~ res.malA)
+summary(an.p_malA) # r-sq = 13.5! on Adenostoma
+
+ndA=data.frame(res.malA=seq(min(res.malA), max(res.malA), len=50))
+predsA <- predict(an.p_malA, newdata=ndA, type = "response", se.fit=TRUE)
+ndA$fit <- predsA$fit
+ndA$lower <- predsA$fit - predsA$se.fit
+ndA$upper <- predsA$fit + predsA$se.fit
+
+# Ceanothus
+
+an.s2C <- lm(mas ~ c.mal + c.no_art_5 , data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "C", ])
+summary(an.s2C) # R-sq = 18.4 %
+
+an.mas.artC <- lm(mas ~ c.no_art_5, data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "C", ])
+an.mal.artC <- lm(c.mal ~ c.no_art_5, data=n1.3[n1.3$no_art_5 > 2 & n1.3$no_tim > 0 & n1.3$host == "C", ])
+
+res.masC <- resid(an.mas.artC)
+res.malC <- resid(an.mal.artC)
+
+an.resC <- lm(res.masC ~ res.malC); summary(an.resC)
+ndC=data.frame(res.malC=seq(min(res.malC), max(res.malC), len=50))
+predsC <- predict(an.resC, newdata=ndC, type = "response", se.fit=TRUE)
+ndC$fit <- predsC$fit
+ndC$lower <- predsC$fit - predsC$se.fit
+ndC$upper <- predsC$fit + predsC$se.fit
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_mas_mal.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 7, 1, 1))
+
+plot(y=c(res.masA, res.masC),
+     x=c(res.malA, res.malC),
+     xlab = "", 
+     ylab = "", 
+     las=1, type="n", cex.lab=2, cex.axis=2, cex=2)
+
+title(ylab="mass-abundance slope (residuals)", cex.lab=3, line=4.5)
+title(xlab="maladaptation (residuals)", cex.lab=3, line=4)
+
+points(y=res.masC, x=res.malC, 
+       pch=16, col="orange", cex=2)
+points(y=res.masA, x=res.malA, 
+       pch=16, col="blue", cex=2)
+
+
+#lines(nd$res.mal, nd$upper, lty=2)
+#lines(nd$res.mal, nd$lower, lty=2)
+
+polygon(x = c(ndA$res.malA, rev(ndA$res.malA)), 
+        y = c(ndA$upper, rev(ndA$lower)), 
+        col="blue", density=50, lwd=.5, border=NA)
+
+lines(ndA$res.malA, ndA$fit,
+      col="blue", lwd=2)
+
+legend(x=-.5, y=.35, 
+       legend=c(expression(italic("C. spinosus"), italic( "A. fasciculatum"))), 
+       pch=c(16, 16), col=c("orange", "blue"), 
+       bg=NULL, bty="n", cex=2, y.intersp = 1)
+
+dev.off()
+
+```
+
+```{r Carbon:Nitrogen}
+p.n1 <- n1[complete.cases(n1$host, n1$c.mal, n1$cn2) & n1$pN < 1, ]
+p.n1$c.host <- ifelse(p.n1$host == "A", -.5, .5)
+
+an.mal <- lm(c.mal ~ c.host, data=p.n1)
+an.cn_h <- lm(cn2 ~ c.host, data=p.n1)
+
+r.mal <- resid(an.mal)
+r.cn_h <- resid(an.cn_h)
+
+an.res <- lm(r.cn_h ~ r.mal); summary(an.res)
+nd=data.frame(r.mal=seq(min(r.mal), max(r.mal), len=50))
+preds <- predict(an.res, newdata=nd, type = "response", se.fit=TRUE)
+nd$fit <- preds$fit
+nd$lower <- preds$fit - preds$se.fit
+nd$upper <- preds$fit + preds$se.fit
+
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_cn_mal.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 6, 1, 1))
+
+plot(y=r.cn_h, x=r.mal, 
+     xlab="", ylab="", 
+     las=1, pch=16, 
+     cex=2, cex.lab=3, cex.axis=2)
+
+title(ylab="carbon:nitrogen ratio (residuals)", cex.lab=3, line=3.5)
+title(xlab="maladaptation (residuals)", cex.lab=3, line=4)
+#axis.break(axis=2, breakpos=3.5)
+
+polygon(x = c(nd$r.mal, rev(nd$r.mal)), 
+        y = c(nd$upper, rev(nd$lower)), 
+        col="grey", density=100, lwd=.5)
+
+lines(nd$r.mal, nd$fit, lwd=2)
+
+dev.off()
+
+
+# carbon on CN
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_cn_pC.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 7, 3, 1))
+
+plot(y=p.n1$cn2, x=p.n1$pC, 
+     ylab="", xlab="", 
+     las=1, pch=16, col=ifelse(p.n1$host == "A", "blue", "orange"),
+     cex=2, cex.lab=3, cex.axis=2)
+
+title(ylab="carbon:nitrogen ratio", line=4.5, cex.lab=3)
+title(xlab="mass carbon (mg)", line=4.5, cex.lab=3)
+
+legend(x=7.25, y=33, 
+       legend=c(expression(italic("C. spinosus"), italic( "A. fasciculatum"))), 
+       pch=c(16, 16), col=c("orange", "blue"), 
+       bg=NULL, bty="n", cex=2, y.intersp = 1)
+
+dev.off()
+
+# nitrogen on CN
+
+an_n <- lm(cn2 ~ pN + I(pN ^ 2), data=p.n1)
+summary(an_n)
+
+nd <- data.frame(pN=seq(min(p.n1$pN), max(p.n1$pN), len=50))
+preds <- predict(an_n, newdata=nd, type="response", se.fit=TRUE)
+nd <- cbind(nd, fit=preds$fit, upper=preds$fit + preds$se.fit, lower=preds$fit-preds$se.fit)
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_cn_pN.jpg", 
+     width=750, height=750)
+
+par(mar=c(6, 7, 1, 1))
+
+plot(y=p.n1$cn2, x=p.n1$pN, 
+     ylab="", xlab="", 
+     las=1, pch=16, col=ifelse(p.n1$host == "A", "blue", "orange"),
+     cex=2, cex.lab=2, cex.axis=2)
+
+title(ylab="carbon:nitrogen ratio", line=4.5, cex.lab=3)
+title(xlab="mass nitrogen (mg)", line=4.5, cex.lab=3)
+
+polygon(x = c(nd$pN, rev(nd$pN)), 
+        y = c(nd$upper, rev(nd$lower)), 
+        col="grey", density=100, lwd=.5)
+
+lines(nd$pN, nd$fit, lwd=2, col="grey")
+
+legend(x=.5, y=30, 
+       legend=c(expression(italic("C. spinosus"), italic( "A. fasciculatum"))), 
+       pch=c(16, 16), col=c("orange", "blue"), 
+       bg=NULL, bty="n", cex=2, y.intersp = 1)
+
+dev.off()
+
+```
+
+```{r Map of Network}
+n1$occ <- ifelse(n1$no_tim_gs==0, FALSE, TRUE)
+n1$radius <- (n1$vol_cub/(100000*pi))^(1/3)
+
+n1_occ <- n1[n1$occ,]
+
+adOnly <- n1_occ[n1_occ$host=="A",]
+ceOnly <- n1_occ[n1_occ$host=="C",]
+empty <- n1[!n1$occ,]
+
+cFunA <- colorRamp(c("skyblue1", "blue"))
+cFunC <- colorRamp(c("darkorange2", "peachpuff"))
+
+colsA <- rgb(cFunA(adOnly$mal), maxColorValue=255)
+colsC <- rgb(cFunC(ceOnly$mal), maxColorValue=255)
+
+jpeg(file="~/Dropbox/Projects/CA Arthropods/N1/Figures/n1_map.jpg", 
+     width=750, height=750)
+
+par(mar=c(1, 1, 1, 1))
+
+plot(x=1:10, y=1:10, 
+     xlim=c(0,80), ylim=c(-1, 50), 
+     type="n", 
+     xlab="", ylab="",
+     las=1, cex.axis=2, cex.lab=2, axes=FALSE)
+#title(ylab="meters N-S", line=4, cex.lab=2)
+polygon(x=c(-3, -3, 85, 85), y=c(-3, 55, 55, -3), density=500, col="grey")
+polygon(x=c(60, 60, 80, 80), y=c(0, .25, .25, 0), density=500, col="black")
+text(70, -.75, labels="10 meters", cex=1.5)
+symbols(x=adOnly$x, y=adOnly$y, circles=(adOnly$radius), bg=colsA, inches=FALSE,
+        xlim=c(0,75), ylim=c(-1, 50),
+        xlab = "metres E-W", ylab="metres N-S", fg="blue", lwd=2.5, cex.lab=1.5,
+        cex.axis=1.5, add=TRUE)
+symbols(x=ceOnly$x, y=ceOnly$y, circles=(ceOnly$radius), bg=colsC, inches=F, add=T,
+        fg="orange", lwd=2.5)
+symbols(x=empty$x, y=empty$y, circles=(empty$radius), bg="white",
+        fg=ifelse(empty$host=="A", "blue", "orange"),
+        inches=F, add=T, lwd=2.5)
+
+
+
+legend(x=0, y=50, legend=c(expression(italic("A. fasciculatum")), expression(italic("C. spinosus"))), pch=16, col=c("blue", "orange"), bty="n", cex=2)
+
+dev.off()
+```
+
+```{r Community Composition}
+
+ad$taxon <- factor(ifelse(ad$family == "Formicidae", "Formicidae", 
+                          ifelse(ad$order == "Homoptera", "Hemiptera",
+                                 ifelse(ad$order == "Neuroptera", "Chrysopidae",
+                                        ifelse(ad$order == "Aranea",
+                                               as.character(ad$family),
+                                               ifelse(ad$order == "Coleoptera" & ad$family != "", 
+                                                      as.character(ad$family), 
+                                               as.character(ad$order)))))))
+
+#ad$taxon <- factor(ifelse(ad$family != "", as.character(ad$family),
+#                          as.character(ad$order)))
+
+ad$taxon <- factor(ifelse(ad$family == "Formicidae", "Formicidae", 
+                          ifelse(ad$order == "Homoptera", "Hemiptera",
+                                 ifelse(ad$order == "Aranea", "Aranea", 
+                                 ifelse(ad$order %in% c("Chrysopidae", "Diptera",
+                                                        "Hymenoptera"), 
+                                        "Other", as.character(ad$order))))))
+
+orders <- levels(droplevels(ad$taxon[ad$length >=5]))
+
+arts <- setNames(lapply(orders, 
+                        FUN=function(x) table(ad$plant_id[ad$taxon == x & ad$length >=5])),
+                 orders)
+
+newnames <- paste("no_", orders, "_5", sep='')
+
+n1[, newnames] <- 0
+
+for(i in 1:length(newnames)) {
+  
+  n1[match(names(arts[[i]]), n1$plant_id), newnames[i]] <- arts[[i]]
+  
+}
+
+pnames <- paste("p_", orders, sep="")
+
+n1[, pnames] <- 0
+
+for(i in 1:length(pnames)) {
+  
+  n1[, pnames[i]] <- ifelse(n1$no_any_5 == 0, NA, n1[, newnames[i]] / n1[, "no_any_5"])
+  
+}
+
+thresh <- c(seq(0, .9, length.out = 10), 0.9999999)
+
+surv <- do.call(rbind, lapply(pnames, FUN = function(x) {
+  
+  sapply(thresh, FUN=function(y) {
+    
+    sum(n1[, x] > y, na.rm=TRUE)
+    
+  })
+  
+})
+)
+
+dimnames(surv) <- list(orders, c(thresh[1:10], 1))
+
+arttot <- table(droplevels(ad$taxon[ad$length >= 5]))
+
+surv <- cbind(tot=arttot, surv)
+
+surv <- surv[order(surv[, "tot"], decreasing=TRUE), ]
+
+
+#ad[ad$order == "Lepidoptera" & ad$length >= 5, c("order", "family")]
+
+#write.csv(surv, file="~/Dropbox/Projects/CA Arthropods/N1/Data/art_surv.csv", 
+#           row.names=TRUE)
+
+write.csv(surv, file="~/Dropbox/Projects/CA Arthropods/N1/Data/art_surv_gp.csv", 
+           row.names=TRUE)
+
+# smaller things
+
+arttot <- table(droplevels(ad$taxon[ad$length <5]))
+
+ad[ad$family=="Formicidae", c("genus")]
+```
+
+
+```{r Components}
+library(partitions)
+
+p = 0.05
+s = 10
+
+naive.pmf <- function(prob = .05, giveup = 10, max = 40, plot.pmf = TRUE) {
+
+  p = prob
+  s = giveup
+  
+pmf <- c((1 - pgeom(s-1, p)), c(lapply(1:(max-s), function(x) {
+  
+  library(partitions)
+  part <- t(parts(x)) 
+  ps <- lapply(
+          lapply(1:nrow(part), function(y) part[y,]), function(z) z[z > 0])
+  ps <- ps[sapply(ps, function(q) all(q < s))]
+  pt.ct <- mapply(FUN=function(unq, len) factorial(len)/prod(factorial(unq)), 
+       unq=lapply(ps, table), 
+       len=lapply(ps, length))
+  probs <- mapply(function(ps, pt.ct) prod(dgeom(ps-1, prob=p)) * pt.ct,
+      ps = ps, pt.ct = pt.ct)
+  sum(probs) * (1 - pgeom(s-1, p))
+  
+}), recursive=TRUE))
+
+ if(plot.pmf == TRUE) plot(10:max, pmf, type="l")
+
+cum <- sum(pmf) # cumulative density = 0.948273
+expt <- sum(pmf * 10:max) # expected value = 12.0177
+
+list(pmf = pmf, cum = cum, expt = expt)
+}
+
+dgeom(0, .05)
+dgeom(0, .05)^2 + dgeom(1, .05)
+dgeom(0, .05)^3 + 2*(dgeom(1, .05) * dgeom(0, .05)) + dgeom(2, .05)
+
+
+```
+
+```{r}
+lm(c(.3, .65) ~ c(.2, .8))
+st.w <- function(freq) { 1.117 - 0.583 * freq }
+gr.w <- function(freq) { 0.183 + 0.583 * freq}
+
+w.bar <- function(freq) st.w(freq) * freq + gr.w(freq) * (1 - freq)
+
+wbs <- w.bar(seq(0, 1, .01))
+
+cbind(seq(0,1,.01), wbs)
+max(wbs)
+
+plot(seq(0, 1, .01), wbs)
+
+
+wss <- ws(seq(0, 1, .001))
+max(wss - min(wss))
+min(wss)
+ws <- function(freq) {
+  raw <- 1.517 * freq - 1.166 * freq^2 + 0.183
+  (raw - 0.183)/.493415
+  }
+
+ws <- function(freq) {
+  raw <- w.bar(freq)
+  (raw - 0.183)/.493415
+  }
+
+ws(seq(0, 1, .01))
+
+plot(seq(0, 1, .01), ws(seq(0, 1, .01)))
+
+```
+
+```{r asymptotic model}
+
+freq <- seq(0, .99, .01)
+k = 1
+ws <- 1- (1 / (1 - exp(freq)))
+
+plot(freq, ws)
+
+freq <- c(0.2, 0.8)
+an1 <- lm(c(.99, .65) ~ I(1 - exp(-freq)))
+preds <- predict(object = an1, newdata = seq(0, .99, .01))
+
+k = 1
+c = .9
+
+min.RSS <- function(data, par) {
+              with(data, sum((par[1] + par[2] * (1 / (1 - c * exp(-x))) - y)^2))
+}
+
+dat <- data.frame(x = c(0.2, 0.8), y = c(1, .65))
+
+pars <- optim(par = c(0, 1, 1), min.RSS, data=dat)$par
+
+freqs <- seq(0, .99, .01)
+ws <- pars[1] + pars[2] * (1 / (1 - c * exp(-freqs)))
+plot(freqs, ws)
+
+
+
+nfmal <- function(mal=NULL, k=1) {
+  freq <- 1 - mal
+  # adapted moph
+  min.RSS <- function(data, par) {
+              with(data, sum(( (par[1] / (1 - ((par[2] - par[1])/par[2]) * exp((-1) * k * x))) - y)^2))
+  }
+
+  dat.ad <- data.frame(x = c(0.2, 0.8), y = c(1, .65))
+  pars.ad <- optim(par = c(0,1), min.RSS, data=dat.ad)$par
+  
+  freqs <- seq(0, 1, .01)
+  ws.ad <-  (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * freqs)))
+  
+  # plot(freqs, ws.ad)
+  
+  # maladapted morph
+  
+  ws.mal <- rev(ws.ad) - .35 
+  
+  raw <- (ws.ad * freqs) + (ws.mal * (1 - freqs))
+  
+  min.w <- min(raw)
+  max.w <- max(raw - min.w)
+  
+  scaled <- (raw - min.w)/max.w
+  cbind(freqs, scaled)
+  plot(rev(freqs), 1 - scaled)
+  #plot(freqs, ws.ad, ylim=c(-2, 2), type="l")
+  #plot(freqs, ws.ad, type="l")
+  #lines(freqs, ws.mal, lty=2)
+  
+  # for output
+   ws.ad2 <- (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * freq)))
+   ws.mal2 <- (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * (1-freq)))) - .35
+   raw2 <- (ws.ad2 * freq) + (ws.mal2 * (1 - freq))
+   sc2 <- (raw2-min.w) / max.w
+  
+  #plot(freqs, mal)
+  #pars.ad
+
+  1 - sc2
+
+}
+
+
+#####
+lm(c(1, .65) ~ c(.16, ))
+st.w <- function(freq) { 1.117 - 0.583 * freq*(1-freq)}
+gr.w <- function(freq) { 0.183 + 0.583 * freq*(1-freq)}
+
+w.bar <- function(freq) st.w(freq-.01) * freq + gr.w(freq-.01) * (1 - (freq-.01))
+
+wbs <- w.bar(seq(0, 1, .01))
+
+cbind(seq(0,1,.01), wbs)
+max(wbs)
+
+plot(seq(0, 1, .01), wbs)
+
+
+wss <- ws(seq(0, 1, .001))
+max(wss - min(wss))
+min(wss)
+ws <- function(freq) {
+  w.bar <- function(freq) st.w(freq-.01) * freq + gr.w(freq-.01) * (1 - freq-.01)
+  raw <- w.bar(freq) * freq
+  raw/1.10934
+  }
+
+ws(seq(0, 1, .01))
+
+plot(seq(0, 1, .01), ws(seq(0, 1, .01)))
+
+```
+
+```{r NFDS Figures}
+freqs <- seq(0, 1, .01)
+
+png("~/Dropbox/Projects/CA Arthropods/N1/Figures/nfds_mal.png")
+
+plot(freqs, freqs, type="n", 
+     xlab= "frequency of cryptic morph", 
+     ylab= "average population fitness (scaled)", 
+     cex.lab = 1.5, las = 1, cex.axis = 1.5)
+
+for (k in c(0.01, .6 , 1.2, 2, 3, 4)) {
+  
+  min.RSS <- function(data, par) {
+              with(data, sum(( (par[1] / (1 - ((par[2] - par[1])/par[2]) * exp((-1) * k * x))) - y)^2))
+  }
+
+  dat.ad <- data.frame(x = c(0.2, 0.8), y = c(1, .65))
+  pars.ad <- optim(par = c(0,1), min.RSS, data=dat.ad)$par
+  
+  freqs <- seq(0, 1, .01)
+  ws.ad <-  (pars.ad[1] / (1 - ((pars.ad[2] - pars.ad[1])/pars.ad[2]) * exp((-1) * k * freqs)))
+  
+  
+  # maladapted morph
+  
+  ws.mal <- rev(ws.ad) - .35 
+  
+  raw <- (ws.ad * freqs) + (ws.mal * (1 - freqs))
+  
+  min.w <- min(raw)
+  max.w <- max(raw - min.w)
+  
+  scaled <- (raw - min.w)/max.w
+  
+  lines(freqs, scaled)
+}
+
+text(c(.2, .7), c(.8, .6), 
+     labels=c("k = 0.01", "k = 4.0"),
+     cex=1.5)
+
+dev.off()
+  
+```
+
+
+```{r}
+lm(c(1.667, 1.0835) ~ c(.2, .8))
+lm(c(.5, 1.0835) ~ c(.2, .8))
+st.w <- function(freq) { 1.861 - .972 * (freq/(1-freq)) }
+gr.w <- function(freq) { 0.306 + .972 * (freq/(1-freq)) }
+
+
+
+w.bar <- function(freq) st.w(freq) * freq + gr.w(freq) * (1 - freq)
+
+wbs <- w.bar(seq(0, .99, .01))
+wbs.sc <- (wbs - min(wbs))/max(wbs-min(wbs))
+
+cbind(seq(0,.99,.01), wbs.sc)
+max(wbs)
+
+plot(seq(0, .99, .01), wbs.sc)
+```
+
+```{r}
+png(filename = "~/Dropbox/Projects/CA Arthropods/N1/Figures/NFDS_model.png",
+    width = 300)
+par(mfrow=c(2,1))
+plot(x=c(0,1), y=c(0,1.2), type="n",
+     xlab="cryptic morph frequency",
+     ylab="absolute fitness",
+     las=1)
+abline(a=1.117, b = -0.583)
+abline(a=0.183, b =  0.583, lty=2 )
+abline(h=.65, lty=3, lwd=.5)
+
+legend("topright", 
+       legend=c("cryptic", "conspicuous"),
+       lty=c(1,2),
+       bty="n", cex = .75)
+
+plot(seq(0, 1, .01), wbs.sc, type="l",
+     xlab="cryptic morph frequency",
+     ylab="scaled average absolute fitness",
+     las=1)
+
+dev.off()
+```
+
+
+
+
+
+
+
+
+

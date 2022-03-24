@@ -1,0 +1,49 @@
+herbData <- read.table("herbData.txt", header=T)
+attach(data)
+
+names(data)
+
+library(leaps)
+
+treatment <- as.factor(treatment)
+block <- as.factor(treatment)
+
+# well vs. poorly adapted
+
+wellVPoor <- rep(c(1,0,1,-2), 5)
+ceoVGrn <- rep(c(-1,0,1,0), 5)
+ManVCon <- rep(c(1,-3,1,1), 5)
+
+an1 <- lm(pHol ~ wellVPoor + ceoVGrn + ManVCon)
+summary(an1)
+
+# striped vs. green
+
+strVGrn <- rep(c(0, 0, 1, -1), 5)
+x2 <- rep(c(0, 2, -1, -1), 5)
+x3 <- rep(c(3, -1, -1, -1), 5)
+
+an1 <- lm(pHol ~ strVGrn + x2 + x3)
+summary(an1)
+
+# striped vs. Ceonothus
+
+strVCeo <- rep(c(1, 0, 0, -1), 5)
+x2 <- rep(c(-1, 2, 0, -1), 5)
+x3 <- rep(c(-1, 3, -1, -1), 5)
+
+an1 <- lm(pHol ~ strVCeo + x2 + x3)
+summary(an1)
+
+ceoHerb <- c(herbData$pHol[1], herbData$pHol[5], herbData$pHol[9], 
+             herbData$pHol[13], herbData$pHol[17])
+conHerb <- c(herbData$pHol[2], herbData$pHol[6], herbData$pHol[10], 
+             herbData$pHol[14], herbData$pHol[18])
+grnHerb <- c(herbData$pHol[3], herbData$pHol[7], herbData$pHol[11], 
+             herbData$pHol[15], herbData$pHol[19])
+strHerb <- c(herbData$pHol[4], herbData$pHol[8], herbData$pHol[12], 
+             herbData$pHol[16], herbData$pHol[20])
+
+herbDataOut <- data.frame("control"=conHerb, "Ceonothus"=ceoHerb, "green"=grnHerb, "striped"=strHerb)
+write.table(herbDataOut, "herbDataPrism.txt")
+read.table("herbDataPrism.txt", header=T)

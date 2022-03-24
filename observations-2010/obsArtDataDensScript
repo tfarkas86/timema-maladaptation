@@ -1,0 +1,93 @@
+# load and attach data
+
+data <- read.table("obsArtData2.txt", header=T)
+attach(data)
+
+# define interactive predictors
+
+malHost <- malMd * hostNumAdZ
+malGeo <- malMd * geoCon
+malTim <- malMd * timMd
+hostGeo <- hostNumAdZ * geoCon
+hostTim <- hostNumAdZ * timMd
+geoTim <- geoCon * timMd
+malHostGeo <- malMd * geoCon * hostNumAdZ
+malHostTim <- malMd * hostNumAdZ * timMd
+malGeoTim <- malMd * geoCon * timMd
+hostTimGeo <- hostNumAdZ * timMd * geoCon
+malHostTimGeo <- malMd * hostNumAdZ * timMd * geoCon
+
+predictors <- data.frame(malMd, hostNumCeZ, geoCon, timMd, malHost, malGeo, malTim, hostGeo, hostTim, geoTim, malHostGeo, malHostTim, malGeoTim, hostTimGeo, malHostTimGeo)
+predictors
+length(predictors)
+
+predNames <- c("mal", "host", "geo", "tim", "mal*host", "mal*geo", "mal*Tim", "host*geo", 
+"host*tim", "geo*tim", "mal*host*geo", "mal*host*tim", "mal*geo*tim", "host*tim*geo", "mal*host*tim*geo")
+predNames
+
+library(leaps)
+
+leaps1 <- leaps(predictors, art, method="adjr2", names=predNames, nbest = 52)
+leaps1
+
+bestMods <- order(leaps1$adjr2, decreasing = T)
+
+showMods <- leaps1$which[bestMods,]
+showMods
+
+# best model structure
+# +- 1SD and mean
+
+# Adenostoma
+
+an1 <- lm(art ~ malMd + hostNumAdZ + geoCon + timMd + malMd*hostNumAdZ + malMd*geoCon + malMd*timMd +
+hostNumAdZ*geoCon + hostNumAdZ*timMd + geoCon*timMd + malMd*hostNumAdZ*geoCon + malMd*hostNumAdZ*timMd + 
+hostNumAdZ*geoCon*timMd)
+summary(an1)
+
+an1 <- lm(art ~ malMd + hostNumAdZ + geoCon + timMSD + malMd*hostNumAdZ + malMd*geoCon + malMd*timMSD +
+hostNumAdZ*geoCon + hostNumAdZ*timMSD + geoCon*timMSD + malMd*hostNumAdZ*geoCon + malMd*hostNumAdZ*timMSD + 
+hostNumAdZ*geoCon*timMSD)
+summary(an1)
+
+an1 <- lm(art ~ malMd + hostNumAdZ + geoCon + timPSD + malMd*hostNumAdZ + malMd*geoCon + malMd*timPSD +
+hostNumAdZ*geoCon + hostNumAdZ*timPSD + geoCon*timPSD + malMd*hostNumAdZ*geoCon + malMd*hostNumAdZ*timPSD + 
+hostNumAdZ*geoCon*timPSD)
+summary(an1)
+
+# Ceonothus
+
+an1 <- lm(art ~ malMd + hostNumCeZ + geoCon + timMd + malMd*hostNumCeZ + malMd*geoCon + malMd*timMd +
+hostNumCeZ*geoCon + hostNumCeZ*timMd + geoCon*timMd + malMd*hostNumCeZ*timMd + malMd*geoCon*timMd)
+summary(an1)
+
+an1 <- lm(art ~ malMd + hostNumCeZ + geoCon + timMSD + malMd*hostNumCeZ + malMd*geoCon + malMd*timMSD +
+hostNumCeZ*geoCon + hostNumCeZ*timMSD + geoCon*timMSD + malMd*hostNumCeZ*timMSD + malMd*geoCon*timMSD)
+summary(an1)
+
+an1 <- lm(art ~ malMd + hostNumCeZ + geoCon + timPSD + malMd*hostNumCeZ + malMd*geoCon + malMd*timPSD +
+hostNumCeZ*geoCon + hostNumCeZ*timPSD + geoCon*timPSD + malMd*hostNumCeZ*timPSD + malMd*geoCon*timPSD)
+summary(an1)
+
+# partial plot
+
+an1 <- lm(art ~ arcMalMd + hostNumAdZ + geoCon + timMd + arcMalMd*hostNumAdZ + arcMalMd*geoCon + arcMalMd*timMd +
+hostNumAdZ*geoCon + hostNumAdZ*timMd + geoCon*timMd + arcMalMd*hostNumAdZ*timMd + arcMalMd*geoCon*timMd)
+summary(an1)
+
+resArt <- resid(lm(art ~ hostNumAdZ + geoCon + timMd + malHost + malGeo + malTim + hostGeo + hostTim + 
+geoTim + malHostTim + malGeoTim))
+
+resMal <- resid(lm(arcMalMd ~ hostNumAdZ + geoCon + timMd + malHost + malGeo + malTim + hostGeo + hostTim + 
+geoTim + malHostTim + malGeoTim))
+
+partReg <- lm(resArt ~ resMal)
+summary(partReg)
+
+plot(resMal, resArt, ann = F, pch = 16)
+title(xlab = "proportion maladapted (residuals)", ylab = "arthropod density (residuals)")
+abline(partReg, lwd = 2)
+
+
+
+

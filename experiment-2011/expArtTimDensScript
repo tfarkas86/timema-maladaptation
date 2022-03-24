@@ -1,0 +1,70 @@
+# load and attach data
+
+setwd("~/Dropbox/Projects/CA Arthropods/Data for R")
+expData <- read.table("artData2011.txt", header = T)
+expDataWoCon <- read.table("artData2011WoCon.txt", header=T)
+herbData <- read.table("herbData.txt", header=T)
+herbDataWoCon <- read.table("herbDataWoCon.txt", header=T)
+
+# create Timema density variable
+
+expData$densTim5 <- (expData$count0.5-expData$count5WoT)/expData$size
+expDataWoCon$densTim5 <- (expDataWoCon$count0.5-expDataWoCon$count5WoT)/expDataWoCon$size
+
+# create contrast codes for treatment comparisons
+
+strVMalCodes <- cbind(strVMal=c(1, 0, 1, -2), CeoVGrn=c(-1, 0, 1, 0), 
+                                      x3=c(-1, 3, -1, -1))
+strVGrnCodes <- cbind(strVGrn=c(0, 0, -1, 1), x2=c(0, 2, -1, -1), 
+                                      x3=c(3, -1, -1, -1))
+strVCeoCodes <- cbind(strVCeo=c(1, 0, 0, -1), x2=c(-1, 0, 2, -1), 
+                                      conVTrt=c(-1, 3, -1, -1))
+
+# create contrast codes for comparisons w/o control bushes
+
+strVMalCodes <- cbind(strVMal=c(1, 1, -2), CeoVGrn=c(-1, 1, 0))                   
+strVGrnCodes <- cbind(strVGrn=c(0, -1, 1), x2=c(2, -1, -1))
+strVCeoCodes <- cbind(strVCeo=c(1, 0, -1), x2=c(-1, 2, -1))
+
+
+# change internal contrasts
+
+contrasts(expData$treatment) <- strVMalCodes
+contrasts(expData$treatment) <- strVGrnCodes
+contrasts(expData$treatment) <- strVCeoCodes
+
+contrasts(expDataWoCon$treatment) <- strVMalCodes
+contrasts(expDataWoCon$treatment) <- strVGrnCodes
+contrasts(expDataWoCon$treatment) <- strVCeoCodes
+
+contrasts(herbData$treatment) <- strVMalCodes
+contrasts(herbData$treatment) <- strVGrnCodes
+contrasts(herbData$treatment) <- strVCeoCodes
+
+contrasts(herbDataWoCon$treatment) <- strVMalCodes
+contrasts(herbDataWoCon$treatment) <- strVGrnCodes
+contrasts(herbDataWoCon$treatment) <- strVCeoCodes
+
+# perform basic ANOVA for four focal variables
+
+an1 <- lm(densTim5 ~ treatment, data=expData)
+summary(an1)
+an2 <- lm(dens5WoT ~ treatment, data=expData)
+summary(an2)
+an3 <- lm(dens5Sp ~ treatment, data=expData)
+summary(an3)
+an4 <- lm(pHol ~ treatment, data=herbData)
+summary(an4)
+
+an1 <- lm(densTim5 ~ treatment, data=expDataWoCon)
+summary(an1)
+an2 <- lm(dens5WoT ~ treatment, data=expDataWoCon)
+summary(an2)
+an3 <- lm(dens5Sp ~ treatment, data=expDataWoCon)
+summary(an3)
+an4 <- lm(pHol ~ treatment, data=herbDataWoCon)
+summary(an4)
+
+an1 <- lm(densTim5 ~ treatment , data=expDataWoCon)
+summary(an1)
+TukeyHSD(an1)

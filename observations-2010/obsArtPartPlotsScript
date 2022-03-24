@@ -1,0 +1,244 @@
+data <- read.table("artData.txt", header=T)
+attach(data)
+
+# best model
+
+an1 <- lm(art ~ hostNumAdZ + geoNumAZ + timMd + malMd + hostNumAdZ*geoNumAZ +
+hostNumAdZ*timMd + hostNumAdZ*malMd + timMd*malMd + hostNumAdZ*timMd*malMd)
+summary(an1)
+
+# definition of interaction variables
+
+hostGeo <- hostNumAdZ*geoNumAZ
+hostTim <- hostNumAdZ*timMd
+hostMal <- hostNumAdZ*malMd
+timMal <- timMd*malMd
+hostTimMal <- hostNumAdZ*timMd*malMd
+
+# model lacking mal, but including all interactions with mal
+
+an2 <- lm(art ~ hostNumAdZ + geoNumAZ + timMd + hostGeo +
+hostTim + hostMal + timMal + hostTimMal)
+
+#definition of residuals for above model
+
+artLmal <- resid(an2)
+
+# model lacking mal describing mal
+
+an3 <- lm(malMd ~ hostNumAdZ + geoNumAZ + timMd + hostGeo +
+hostTim + hostMal + timMal + hostTimMal)
+
+# definition of residuals for above model
+
+malLmod <- resid(an3)
+
+# model of residual variation in model lacking mal on residual variation from model on mal
+
+an4 <- lm(artLmal ~ malLmod)
+summary(an4)
+
+# plot of residuals on residuals!
+
+plot(malLmod, artLmal)
+
+
+############ contrast coded meristic variables
+
+# definition of contrast coded variables
+
+geoCon <- c(-.5, .5, -.5, .5, -.5, .5, -.5, .5, .5, .5, -.5, 
+rep(.5, 5), rep(-.5, 3), .5, rep(-.5, 3))
+
+hostCon <- c(rep(-.5, 11), rep(.5, 12))
+
+# best model
+
+an1 <- lm(art ~ hostCon + geoCon + timMd + malMd + hostCon*geoCon +
+hostCon*timMd + hostCon*malMd + timMd*malMd + hostCon*timMd*malMd)
+summary(an1)
+
+# definition of interaction variables
+
+hostGeo <- hostCon*geoCon
+hostTim <- hostCon*timMd
+hostMal <- hostCon*malMd
+timMal <- timMd*malMd
+hostTimMal <- hostCon*timMd*malMd
+
+# residuals from model lacking mal, but including all interactions with mal
+
+artLmal <- resid(lm(art ~ hostCon + geoCon + timMd + hostGeo +
+hostTim + hostMal + timMal + hostTimMal))
+
+# residuals from model lacking mal describing mal
+
+malLmod <- resid(lm(malMd ~ hostCon + geoCon + timMd + hostGeo +
+hostTim + hostMal + timMal + hostTimMal))
+
+# model of residual variation in model lacking mal on residual variation from model on mal
+
+an4 <- lm(artLmal ~ malLmod)
+summary(an4)
+
+# plot of residuals on residuals!
+
+plot(malLmod, artLmal)
+abline(an4)
+
+################ with TimDens +1SD
+
+# best model
+
+geoCon <- c(-.5, .5, -.5, .5, -.5, .5, -.5, .5, .5, .5, -.5, 
+rep(.5, 5), rep(-.5, 3), .5, rep(-.5, 3))
+
+hostCon <- c(rep(-.5, 11), rep(.5, 12))
+
+an1 <- lm(art ~ hostCon + geoCon + timPSD + malMd + hostCon*geoCon +
+hostCon*timPSD + hostCon*malMd + timPSD*malMd + hostCon*timPSD*malMd)
+summary(an1)
+
+# definition of interaction variables
+
+hostGeo <- hostCon*geoCon
+hostTim <- hostCon*timPSD
+hostMal <- hostCon*malMd
+timMal <- timPSD*malMd
+hostTimMal <- hostCon*timPSD*malMd
+
+# model lacking mal, but including all interactions with mal
+
+an2 <- lm(art ~ hostCon + geoCon + timPSD + hostGeo +
+hostTim + hostMal + timMal + hostTimMal)
+
+#definition of residuals for above model
+
+artLmal <- resid(an2)
+
+# model lacking mal describing mal
+
+an3 <- lm(malMd ~ hostCon + geoCon + timPSD + hostGeo +
+hostTim + hostMal + timMal + hostTimMal)
+
+# definition of residuals for above model
+
+malLmod <- resid(an3)
+
+# model of residual variation in model lacking mal on residual variation from model on mal
+
+an4 <- lm(artLmal ~ malLmod)
+summary(an4)
+
+# plot of residuals on residuals!
+
+plot(malLmod, artLmal)
+
+########## residuals plotting for richness
+
+# contrast codes
+
+geoCon <- c(-.5, .5, -.5, .5, -.5, .5, -.5, .5, .5, .5, -.5, 
+rep(.5, 5), rep(-.5, 3), .5, rep(-.5, 3))
+
+hostCon <- c(rep(-.5, 11), rep(.5, 12))
+
+# AIC choice model for richness
+
+an1 <- lm(rich ~ hostNumAdZ+ geoCon + timMd + malMd + hostNumAdZ*geoCon + hostNumAdZ*timMd +    
+hostNumAdZ*malMd + geo*timMd + timMd*malMd + hostNumAdZ*geo*timMd)
+summary(an1)
+
+# definition of interaction variables
+
+hostGeo <- host*geo
+hostTim <- host*timMd
+hostMal <- host*malMd
+geoTim <- geo*timMd
+timMal <- timMd*malMd
+hostGeoTim <- host*geo*timMd
+
+# AIC choice model for richness
+
+an1 <- lm(rich ~ host + geo + timMd + malMd + hostGeo + hostTim
++ hostMal + geoTim + timMal + hostGeoTim)
+summary(an1)
+
+# residuals lacking mal
+
+richLmal <- residuals(lm(rich ~ host + geo + timMd + hostGeo + hostTim
++ hostMal + geoTim + timMal + hostGeoTim))
+
+# partial correlation 
+
+malLmod <- resid(lm(malMd ~ host + geo + timMd + hostGeo + hostTim
++ hostMal + geoTim + timMal + hostGeoTim))
+
+# regression of residuals
+
+an1 <- lm(richLmal ~ malLmod)
+summary(an1)
+
+########## stepwise regression for arthropod density with contrast coded variables
+
+#definition of contrast codes
+
+geoCon <- c(-.5, .5, -.5, .5, -.5, .5, -.5, .5, .5, .5, -.5, 
+rep(.5, 5), rep(-.5, 3), .5, rep(-.5, 3))
+
+hostCon <- c(rep(-.5, 11), rep(.5, 12))
+
+# full model
+
+an1 <- lm(art ~ hostCon + timMd + malMd + hostCon*timMd
++ hostCon*malMd + timMd*malMd + hostCon*timMd*malMd)
+summary(an1)
+step(an1)
+
+# AIC step model w/o geo
+
+an1 <- lm(art ~ hostCon + timMd + malMd + hostCon * timMd + hostCon * malMd + 
+    timMd * malMd + hostCon * timMd * malMd)
+summary(an1)
+
+#AIC step model
+
+an1 <- lm(cat ~ hostCon + geoCon + timMd + malMd + hostCon:geoCon + hostCon:timMd + 
+    hostCon:malMd + geoCon:timMd + geoCon:malMd + timMd:malMd + 
+    geoCon:timMd:malMd + hostCon:timMd:malMd)
+summary(an1)
+
+####### caterpillars
+
+# AIC model w/o geo
+
+an1 <- lm(cat ~ hostCon + timMd + malMd + hostCon * timMd + hostCon * malMd + 
+    timMd * malMd + hostCon * timMd * malMd)
+summary(an1)
+
+# AIC model w/ geo
+
+an1 <- lm(cat ~ hostCon + geoCon + timMd + malMd + hostCon:timMd + hostCon:malMd + 
+    geoCon:timMd + timMd:malMd + hostCon:timMd:malMd)
+summary(an1)
+
+######### full model
+
+geoCon <- c(-.5, .5, -.5, .5, -.5, .5, -.5, .5, .5, .5, -.5, 
+rep(.5, 5), rep(-.5, 3), .5, rep(-.5, 3))
+
+hostCon <- c(rep(-.5, 11), rep(.5, 12))
+
+an1 <- lm(art ~ host + geo + timMd + malMd + host*geo + host*timMd
++ host*malMd + geo*timMd + geo*malMd + timMd*malMd + host*geo*timMd
++ host*geo*malMd + geo*timMd*malMd + host*timMd*malMd + 
+host*geo*timMd*malMd)
+summary(an1)
+
+
+
+
+
+
+
+

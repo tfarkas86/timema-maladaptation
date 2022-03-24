@@ -1,0 +1,55 @@
+# load and attach data
+setwd("~/Dropbox/Projects/CA Arthropods/Data for R")
+artData <- read.table("artData2011.txt", header = T)
+
+artData$count5Tim <- artData$count0.5-artData$count5WoT
+artData$count5Hd[16] <- artData$count5Hd[16]-1
+artData$dens5Hd <- artData$count5Hd/artData$size
+artData$count5Bugs <- artData$count5Hd - artData$cats0.5
+artData$dens5Bugs <- artData$count5Bugs/artData$size
+
+dotchart(artData$dens5WoT)
+dotchart(artData$densHdWoT)
+
+artData$l.dens5WoT <- log(artData$dens5WoT)
+
+strVMalCodes <- cbind(strVMal=c(1, 0, 1, -2), CeoVGrn=c(-1, 0, 1, 0), 
+                      x3=c(-1, 3, -1, -1))
+strVGrnCodes <- cbind(strVGrn=c(0, 0, -1, 1), x2=c(0, 2, -1, -1), 
+                      x3=c(3, -1, -1, -1))
+strVCeoCodes <- cbind(strVCeo=c(1, 0, 0, -1), x2=c(-1, 0, 2, -1), 
+                      conVTrt=c(-1, 3, -1, -1))
+contrasts(artData$treatment) <- strVMalCodes
+
+an1 <- lm(dens5WoT ~ treatment, data=artData)
+an2 <- lm(dens5Hd ~ treatment, data=artData)
+an3 <- lm(dens5Cats ~ treatment, data=artData)
+an4 <- lm(dens5Bugs ~ treatment, data=artData)
+
+summary(an1)
+summary(an2)
+summary(an3)
+summary(an4)
+plot(an1)
+plot(an2)
+plot(an3)
+
+library(nlme)
+vf <- varIdent(form= ~1 | treatment)
+an1 <- gls(dens5WoT ~ treatment, data=artData, weights=vf)
+summary(an1)
+anova(an1)
+plot(an1)
+
+ceoArt <- c(artData$dens5WoT[1], artData$dens5WoT[5], artData$dens5WoT[9], 
+              artData$dens5WoT[13], artData$dens5WoT[17])
+conArt <- c(artData$dens5WoT[2], artData$dens5WoT[6], artData$dens5WoT[10], 
+              artData$dens5WoT[14], artData$dens5WoT[18])
+grnArt <- c(artData$dens5WoT[3], artData$dens5WoT[7], artData$dens5WoT[11], 
+              artData$dens5WoT[15], artData$dens5WoT[19])
+strArt <- c(artData$dens5WoT[4], artData$dens5WoT[8], artData$dens5WoT[12], 
+              artData$dens5WoT[16], artData$dens5WoT[20])
+
+artDensOut <- data.frame("control" = conArt, "Ceonothus"=ceoArt, "green"=grnArt,"striped"=strArt)
+write.table(artDensOut, "artDens.txt")
+read.table("artDens.txt", header=T)

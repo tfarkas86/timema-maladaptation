@@ -1,0 +1,31 @@
+# load and attach data
+
+data <- read.table("artData2011.txt", header = T)
+attach(data)
+
+# create contrast codes for striped vs. green comparison
+
+stVgr <- rep(c(0,0,-.5,.5), 5)
+x2 <- rep(c(0,1,-.5,-.5), 5)
+x3 <- rep(c(1.5, -.5, -.5, -.5), 5)
+
+an1 <- lm(dens5Sp ~ stVgr + x2 + x3)
+summary(an1)
+
+# create contrast codes for striped vs. Ceonothus
+
+stVCeo <- rep(c(1,0,0,-1),5)
+x2 <- rep(c(-1,0,2,-1),5)
+x3 <- rep(c(-1,3,-1,-1),5)
+
+an1 <- lm(dens5Sp ~ stVCeo + x2 + x3)
+summary(an1)
+
+# create contrast codes for well vs. poorly adapted
+
+wVp <- rep(c(1,0,1,-2),5)
+x2 <- rep(c(-1,0,1,0),5)
+x3 <- rep(c(-1,3,-1,-1),5)
+
+an1 <- lm(dens5Sp ~ wVp + x2 + x3)
+summary(an1)
